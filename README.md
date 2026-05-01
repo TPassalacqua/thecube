@@ -1,2 +1,2 @@
-# thecube.github.io
-the cube
+# thecube
+Just vibecodin the cube cause I'm bored.
