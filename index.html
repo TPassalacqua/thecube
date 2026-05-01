@@ -59,6 +59,9 @@
             padding-bottom: 10px;
             color: #aaa;
             font-size: 1.2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         /* Item Display */
@@ -101,6 +104,13 @@
         }
 
         /* Controls */
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #888;
+            font-size: 0.9rem;
+        }
+
         select {
             width: 100%;
             padding: 10px;
@@ -163,6 +173,48 @@
         .log-success { color: #4caf50; }
         .log-warning { color: #ff9800; }
         .log-error { color: #f44336; }
+        .log-prism { color: #bcaaa4; font-style: italic; }
+
+        /* Reference Section */
+        .reference-panel {
+            margin-top: 20px;
+            max-width: 900px;
+            width: 100%;
+        }
+
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 15px;
+        }
+
+        .category-card {
+            background-color: #111;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 15px;
+        }
+
+        .category-card h3 {
+            margin-top: 0;
+            color: var(--accent-gold);
+            font-size: 1rem;
+            border-bottom: 1px dashed #333;
+            padding-bottom: 5px;
+        }
+
+        .category-card ul {
+            list-style-type: none;
+            padding-left: 0;
+            margin: 0;
+            font-size: 0.9rem;
+            color: #bbb;
+        }
+
+        .category-card li {
+            margin-bottom: 4px;
+        }
     </style>
 </head>
 <body>
@@ -171,7 +223,7 @@
 
     <div class="container">
         <div class="panel">
-            <h2>Current Item</h2>
+            <h2>Current Item <span id="affix-count" style="font-size: 0.8rem; color: #666;">(0/4 Affixes)</span></h2>
             <div id="item-display" class="item-display">
                 <div style="color: #666; text-align: center; margin-top: 80px;">No item selected.<br>Generate a base item to begin crafting.</div>
             </div>
@@ -180,6 +232,7 @@
         <div class="panel">
             <h2>Cube Recipes</h2>
             
+            <label for="item-base">Base Item Type</label>
             <select id="item-base">
                 <option value="sword">1H Sword</option>
                 <option value="staff">2H Staff</option>
@@ -188,7 +241,17 @@
                 <option value="ring">Ring</option>
                 <option value="amulet">Amulet</option>
             </select>
+
             <button class="full-width" style="width: 100%; margin-bottom: 20px;" onclick="generateBaseItem()">Generate Rare Base</button>
+
+            <label for="prism-select">Catalyst / Prism</label>
+            <select id="prism-select">
+                <option value="None">None (Standard Craft)</option>
+                <option value="Scattered Prism">Scattered Prism (Add Sockets)</option>
+                <option value="Prism of Destruction">Prism of Destruction (Offense Focus)</option>
+                <option value="Prism of Protection">Prism of Protection (Defense Focus)</option>
+                <option value="Prism of Utility">Prism of Utility (Utility Focus)</option>
+            </select>
 
             <div class="recipe-grid">
                 <button id="btn-add" onclick="addAffix()" disabled>Add Affix</button>
@@ -204,15 +267,44 @@
         <div class="log-entry">Welcome to the Horadric Cube Simulator.</div>
     </div>
 
+    <div class="panel reference-panel">
+        <h2>Affix Categories</h2>
+        <div id="category-container" class="category-grid">
+            </div>
+    </div>
+
     <script>
-        // Data Pools
-        const possibleAffixes = [
-            "+60 Maximum Life", "+10% Attack Speed", "+15% Critical Strike Chance",
-            "+25% Critical Strike Damage", "+30% Vulnerable Damage", "+8% Dodge Chance",
-            "+45 Strength", "+45 Dexterity", "+45 Intelligence", "+45 Willpower",
-            "Cooldown Reduction 8%", "Resource Generation 12%", "+2 to Core Skills",
-            "Movement Speed +15%", "Armor +250"
-        ];
+        // Data Structure for Affixes
+        const affixCategories = {
+            "Offensive": [
+                "+10% Attack Speed", 
+                "+15% Critical Strike Chance", 
+                "+25% Critical Strike Damage", 
+                "+30% Vulnerable Damage", 
+                "+2 to Core Skills"
+            ],
+            "Defensive": [
+                "+60 Maximum Life", 
+                "+8% Dodge Chance", 
+                "Armor +250",
+                "Damage Reduction 5%"
+            ],
+            "Attributes": [
+                "+45 Strength", 
+                "+45 Dexterity", 
+                "+45 Intelligence", 
+                "+45 Willpower"
+            ],
+            "Utility & Resource": [
+                "Cooldown Reduction 8%", 
+                "Resource Generation 12%", 
+                "Movement Speed +15%",
+                "+15% Lucky Hit Chance"
+            ]
+        };
+
+        // Flatten the object into a single array for random rolling
+        const possibleAffixes = Object.values(affixCategories).flat();
 
         const legendaryPowers = [
             "Your Core Skills deal 25% increased damage.",
@@ -233,16 +325,44 @@
         };
 
         let currentItem = null;
-        let maxAffixes = 5;
+        let maxAffixes = 4; // Updated max limit
+
+        // Initialization
+        window.onload = () => {
+            renderAffixCategories();
+        };
+
+        function renderAffixCategories() {
+            const container = document.getElementById("category-container");
+            for (const [category, affixes] of Object.entries(affixCategories)) {
+                let html = `<div class="category-card"><h3>${category}</h3><ul>`;
+                affixes.forEach(affix => {
+                    html += `<li>${affix}</li>`;
+                });
+                html += `</ul></div>`;
+                container.innerHTML += html;
+            }
+        }
 
         // Core Functions
+        function getSelectedPrism() {
+            return document.getElementById("prism-select").value;
+        }
+
         function generateBaseItem() {
             const baseType = document.getElementById("item-base").value;
+            // Generate a rare base with 2 or 3 affixes initially
+            const startingAffixCount = Math.floor(Math.random() * 2) + 2; 
+            const initialAffixes = [];
+            for(let i = 0; i < startingAffixCount; i++) {
+                initialAffixes.push(getRandomAffix());
+            }
+
             currentItem = {
                 type: baseType,
                 name: `Ancestral Rare ${baseType.charAt(0).toUpperCase() + baseType.slice(1)}`,
                 rarity: "rare",
-                affixes: [getRandomAffix(), getRandomAffix(), getRandomAffix()],
+                affixes: initialAffixes,
                 legendaryPower: null
             };
             
@@ -256,29 +376,42 @@
 
         // Cube Recipes
         function addAffix() {
+            const prism = getSelectedPrism();
             if (currentItem.affixes.length >= maxAffixes) {
                 log(`Failed: Item already has the maximum of ${maxAffixes} affixes.`, 'error');
                 return;
             }
-            const newAffix = getRandomAffix();
+            
+            let newAffix = getRandomAffix();
+            
+            // Basic simulation of a Prism influencing the roll
+            if (prism === "Prism of Destruction") newAffix = affixCategories["Offensive"][Math.floor(Math.random() * affixCategories["Offensive"].length)];
+            if (prism === "Prism of Protection") newAffix = affixCategories["Defensive"][Math.floor(Math.random() * affixCategories["Defensive"].length)];
+            if (prism === "Prism of Utility") newAffix = affixCategories["Utility & Resource"][Math.floor(Math.random() * affixCategories["Utility & Resource"].length)];
+
             currentItem.affixes.push(newAffix);
+            
+            if (prism !== "None") log(`Catalyst active: Consumed 1x [${prism}]`, 'log-prism');
             log(`Gear Modification (Add Affix): Successfully added [${newAffix}].`, 'success');
             updateUI();
         }
 
         function removeAffix() {
+            const prism = getSelectedPrism();
             if (currentItem.affixes.length === 0) {
                 log("Failed: No affixes left to remove.", 'error');
                 return;
             }
-            // Remove a random affix to simulate the chaotic nature of the cube
             const index = Math.floor(Math.random() * currentItem.affixes.length);
             const removed = currentItem.affixes.splice(index, 1)[0];
+            
+            if (prism !== "None") log(`Catalyst active: Consumed 1x [${prism}]`, 'log-prism');
             log(`Gear Modification (Remove Affix): Destroyed [${removed}].`, 'warning');
             updateUI();
         }
 
         function rerollAffix() {
+            const prism = getSelectedPrism();
             if (currentItem.affixes.length === 0) {
                 log("Failed: No affixes to reroll.", 'error');
                 return;
@@ -287,15 +420,22 @@
             const oldAffix = currentItem.affixes[index];
             let newAffix = getRandomAffix();
             
-            // Ensure we don't roll the exact same affix
+            // Simulation of Prism influence on reroll
+            if (prism === "Prism of Destruction") newAffix = affixCategories["Offensive"][Math.floor(Math.random() * affixCategories["Offensive"].length)];
+            if (prism === "Prism of Protection") newAffix = affixCategories["Defensive"][Math.floor(Math.random() * affixCategories["Defensive"].length)];
+            if (prism === "Prism of Utility") newAffix = affixCategories["Utility & Resource"][Math.floor(Math.random() * affixCategories["Utility & Resource"].length)];
+
             while (newAffix === oldAffix) { newAffix = getRandomAffix(); }
             
             currentItem.affixes[index] = newAffix;
+            
+            if (prism !== "None") log(`Catalyst active: Consumed 1x [${prism}]`, 'log-prism');
             log(`Chaotic Reroll: Replaced [${oldAffix}] with [${newAffix}].`, 'warning');
             updateUI();
         }
 
         function upgradeLegendary() {
+            const prism = getSelectedPrism();
             if (currentItem.rarity !== 'rare') {
                 log("Failed: Only Rare items can be upgraded to Legendary.", 'error');
                 return;
@@ -303,17 +443,21 @@
             currentItem.rarity = 'legendary';
             currentItem.name = currentItem.name.replace("Rare", "Legendary");
             currentItem.legendaryPower = legendaryPowers[Math.floor(Math.random() * legendaryPowers.length)];
+            
+            if (prism !== "None") log(`Catalyst active: Consumed 1x [${prism}]`, 'log-prism');
             log(`Item Transmutation (Upgrade to Legendary): Item empowered!`, 'success');
             updateUI();
         }
 
         function upgradeUnique() {
+            const prism = getSelectedPrism();
             if (currentItem.rarity === 'unique') {
                 log("Failed: Item is already a Unique.", 'error');
                 return;
             }
             
-            // 20% chance of bricking the item as a risk factor for jumping straight to unique
+            if (prism !== "None") log(`Catalyst active: Consumed 1x [${prism}]`, 'log-prism');
+
             if (Math.random() < 0.20) {
                 log(`Item Transmutation (Upgrade to Unique): FAILED! The item was destroyed in the cube.`, 'error');
                 currentItem = null;
@@ -334,8 +478,8 @@
         // UI & Logging
         function updateUI() {
             const display = document.getElementById("item-display");
+            const countDisplay = document.getElementById("affix-count");
             
-            // Toggle Buttons
             const hasItem = currentItem !== null;
             document.getElementById("btn-add").disabled = !hasItem || (hasItem && currentItem.rarity === 'unique');
             document.getElementById("btn-remove").disabled = !hasItem || (hasItem && currentItem.rarity === 'unique');
@@ -346,13 +490,13 @@
             if (!hasItem) {
                 display.className = "item-display";
                 display.innerHTML = '<div style="color: #666; text-align: center; margin-top: 80px;">Item destroyed.<br>Generate a new base item.</div>';
+                countDisplay.innerText = `(0/${maxAffixes} Affixes)`;
                 return;
             }
 
-            // Update Class Rarity
+            countDisplay.innerText = `(${currentItem.affixes.length}/${maxAffixes} Affixes)`;
             display.className = `item-display rarity-${currentItem.rarity}`;
 
-            // Render Item HTML
             let html = `<div class="item-title rarity-${currentItem.rarity}">${currentItem.name}</div>`;
             
             if (currentItem.affixes.length > 0) {
@@ -381,6 +525,7 @@
             if (type === 'success') typeClass = 'log-success';
             if (type === 'error') typeClass = 'log-error';
             if (type === 'warning') typeClass = 'log-warning';
+            if (type === 'log-prism') typeClass = 'log-prism';
 
             logBox.innerHTML += `<div class="log-entry ${typeClass}">[${time}] ${message}</div>`;
             logBox.scrollTop = logBox.scrollHeight;
