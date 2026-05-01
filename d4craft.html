@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diablo 4: Horadric Cube Simulator</title>
+    <style>
+        :root {
+            --bg-color: #0d0d0d;
+            --panel-bg: #1a1a1a;
+            --border-color: #333;
+            --text-main: #dfdfdf;
+            --accent-gold: #c79f53;
+            --rare-color: #ffd700;
+            --legendary-color: #ff8c00;
+            --unique-color: #c2b280;
+            --btn-hover: #2a2a2a;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 30px 10px;
+            margin: 0;
+        }
+
+        h1 {
+            color: var(--accent-gold);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .container {
+            display: flex;
+            gap: 20px;
+            max-width: 900px;
+            width: 100%;
+            flex-wrap: wrap;
+        }
+
+        .panel {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 20px;
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .panel h2 {
+            margin-top: 0;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            color: #aaa;
+            font-size: 1.2rem;
+        }
+
+        /* Item Display */
+        .item-display {
+            border: 2px solid #444;
+            padding: 20px;
+            min-height: 250px;
+            background-color: #111;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .item-title {
+            font-size: 1.4rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-transform: capitalize;
+        }
+
+        .rarity-rare { color: var(--rare-color); border-color: var(--rare-color); }
+        .rarity-legendary { color: var(--legendary-color); border-color: var(--legendary-color); }
+        .rarity-unique { color: var(--unique-color); border-color: var(--unique-color); }
+        
+        .affix-list {
+            list-style-type: disc;
+            padding-left: 20px;
+            margin: 10px 0;
+        }
+
+        .affix-list li {
+            margin: 6px 0;
+            color: #ccc;
+        }
+
+        .legendary-power {
+            margin-top: 15px;
+            color: var(--legendary-color);
+            font-style: italic;
+        }
+
+        /* Controls */
+        select {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            background-color: #222;
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        .recipe-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        button {
+            background-color: #222;
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        button:hover:not(:disabled) {
+            background-color: var(--btn-hover);
+            border-color: var(--accent-gold);
+            color: var(--accent-gold);
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .full-width {
+            grid-column: span 2;
+        }
+
+        /* Action Log */
+        #log {
+            margin-top: 20px;
+            background-color: #050505;
+            padding: 15px;
+            height: 150px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            font-family: 'Courier New', Courier, monospace;
+            width: 100%;
+            max-width: 900px;
+            border-radius: 6px;
+            color: #888;
+        }
+
+        .log-entry { margin-bottom: 5px; }
+        .log-success { color: #4caf50; }
+        .log-warning { color: #ff9800; }
+        .log-error { color: #f44336; }
+    </style>
+</head>
+<body>
+
+    <h1>Horadric Cube Simulator</h1>
+
+    <div class="container">
+        <div class="panel">
+            <h2>Current Item</h2>
+            <div id="item-display" class="item-display">
+                <div style="color: #666; text-align: center; margin-top: 80px;">No item selected.<br>Generate a base item to begin crafting.</div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Cube Recipes</h2>
+            
+            <select id="item-base">
+                <option value="sword">1H Sword</option>
+                <option value="staff">2H Staff</option>
+                <option value="helm">Helm</option>
+                <option value="chest">Chest Armor</option>
+                <option value="ring">Ring</option>
+                <option value="amulet">Amulet</option>
+            </select>
+            <button class="full-width" style="width: 100%; margin-bottom: 20px;" onclick="generateBaseItem()">Generate Rare Base</button>
+
+            <div class="recipe-grid">
+                <button id="btn-add" onclick="addAffix()" disabled>Add Affix</button>
+                <button id="btn-remove" onclick="removeAffix()" disabled>Remove Affix</button>
+                <button class="full-width" id="btn-reroll" onclick="rerollAffix()" disabled>Chaotic Reroll (Random Affix)</button>
+                <button class="full-width" id="btn-legendary" onclick="upgradeLegendary()" disabled>Upgrade to Legendary</button>
+                <button class="full-width" id="btn-unique" onclick="upgradeUnique()" disabled>Upgrade to Unique</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="log">
+        <div class="log-entry">Welcome to the Horadric Cube Simulator.</div>
+    </div>
+
+    <script>
+        // Data Pools
+        const possibleAffixes = [
+            "+60 Maximum Life", "+10% Attack Speed", "+15% Critical Strike Chance",
+            "+25% Critical Strike Damage", "+30% Vulnerable Damage", "+8% Dodge Chance",
+            "+45 Strength", "+45 Dexterity", "+45 Intelligence", "+45 Willpower",
+            "Cooldown Reduction 8%", "Resource Generation 12%", "+2 to Core Skills",
+            "Movement Speed +15%", "Armor +250"
+        ];
+
+        const legendaryPowers = [
+            "Your Core Skills deal 25% increased damage.",
+            "Critical Strikes grant 15% Movement Speed for 4 seconds.",
+            "Basic Attacks generate 20% more Primary Resource.",
+            "Taking direct damage grants a Barrier for 15% of your Maximum Life.",
+            "Evading leaves behind a pool of fire that deals 200 damage over 3 seconds.",
+            "Hitting an Elite enemy grants a random Shrine buff for 5 seconds."
+        ];
+
+        const uniqueTemplates = {
+            sword: { name: "The Grandfather", power: "Increases your Critical Strike Damage by 100%.", affixes: ["+3000 Maximum Life", "+100% Damage", "Ignores Durability Loss", "+72 All Stats"] },
+            staff: { name: "Ahavarion, Spear of Lycander", power: "Gain a random Shrine effect for 20 seconds after killing an Elite.", affixes: ["+15% Attack Speed", "+30% Critical Strike Chance", "+100% Damage", "Cooldown Reduction 10%"] },
+            helm: { name: "Harlequin Crest", power: "Gain 20% Damage Reduction. In addition, gain +4 Ranks to all Skills.", affixes: ["+1000 Maximum Life", "Cooldown Reduction 10%", "Resource Generation 12%", "+42 All Stats"] },
+            chest: { name: "Tyrael's Might", power: "While at full Life, your Skills unleash a divine barrage dealing damage.", affixes: ["+15% Movement Speed", "+20% All Resistances", "Damage Reduction 15%", "Ignores Durability Loss"] },
+            ring: { name: "Ring of Starless Skies", power: "Spending Resource reduces the Resource cost of your Skills.", affixes: ["+10% Critical Strike Chance", "+20% Critical Strike Damage", "+15% Lucky Hit Chance", "+2 to Core Skills"] },
+            amulet: { name: "Melted Heart of Selig", power: "Gain +30 Maximum Resource. When taking damage, drain Resource instead of Life.", affixes: ["+25% All Resistances", "+15% Movement Speed", "+45 All Stats", "Resource Generation 20%"] }
+        };
+
+        let currentItem = null;
+        let maxAffixes = 5;
+
+        // Core Functions
+        function generateBaseItem() {
+            const baseType = document.getElementById("item-base").value;
+            currentItem = {
+                type: baseType,
+                name: `Ancestral Rare ${baseType.charAt(0).toUpperCase() + baseType.slice(1)}`,
+                rarity: "rare",
+                affixes: [getRandomAffix(), getRandomAffix(), getRandomAffix()],
+                legendaryPower: null
+            };
+            
+            log(`Created new base item: ${currentItem.name}`, 'success');
+            updateUI();
+        }
+
+        function getRandomAffix() {
+            return possibleAffixes[Math.floor(Math.random() * possibleAffixes.length)];
+        }
+
+        // Cube Recipes
+        function addAffix() {
+            if (currentItem.affixes.length >= maxAffixes) {
+                log(`Failed: Item already has the maximum of ${maxAffixes} affixes.`, 'error');
+                return;
+            }
+            const newAffix = getRandomAffix();
+            currentItem.affixes.push(newAffix);
+            log(`Gear Modification (Add Affix): Successfully added [${newAffix}].`, 'success');
+            updateUI();
+        }
+
+        function removeAffix() {
+            if (currentItem.affixes.length === 0) {
+                log("Failed: No affixes left to remove.", 'error');
+                return;
+            }
+            // Remove a random affix to simulate the chaotic nature of the cube
+            const index = Math.floor(Math.random() * currentItem.affixes.length);
+            const removed = currentItem.affixes.splice(index, 1)[0];
+            log(`Gear Modification (Remove Affix): Destroyed [${removed}].`, 'warning');
+            updateUI();
+        }
+
+        function rerollAffix() {
+            if (currentItem.affixes.length === 0) {
+                log("Failed: No affixes to reroll.", 'error');
+                return;
+            }
+            const index = Math.floor(Math.random() * currentItem.affixes.length);
+            const oldAffix = currentItem.affixes[index];
+            let newAffix = getRandomAffix();
+            
+            // Ensure we don't roll the exact same affix
+            while (newAffix === oldAffix) { newAffix = getRandomAffix(); }
+            
+            currentItem.affixes[index] = newAffix;
+            log(`Chaotic Reroll: Replaced [${oldAffix}] with [${newAffix}].`, 'warning');
+            updateUI();
+        }
+
+        function upgradeLegendary() {
+            if (currentItem.rarity !== 'rare') {
+                log("Failed: Only Rare items can be upgraded to Legendary.", 'error');
+                return;
+            }
+            currentItem.rarity = 'legendary';
+            currentItem.name = currentItem.name.replace("Rare", "Legendary");
+            currentItem.legendaryPower = legendaryPowers[Math.floor(Math.random() * legendaryPowers.length)];
+            log(`Item Transmutation (Upgrade to Legendary): Item empowered!`, 'success');
+            updateUI();
+        }
+
+        function upgradeUnique() {
+            if (currentItem.rarity === 'unique') {
+                log("Failed: Item is already a Unique.", 'error');
+                return;
+            }
+            
+            // 20% chance of bricking the item as a risk factor for jumping straight to unique
+            if (Math.random() < 0.20) {
+                log(`Item Transmutation (Upgrade to Unique): FAILED! The item was destroyed in the cube.`, 'error');
+                currentItem = null;
+                updateUI();
+                return;
+            }
+
+            const template = uniqueTemplates[currentItem.type];
+            currentItem.rarity = 'unique';
+            currentItem.name = template.name;
+            currentItem.affixes = [...template.affixes];
+            currentItem.legendaryPower = template.power;
+            
+            log(`Item Transmutation (Upgrade to Unique): Incredible success! Forged ${currentItem.name}.`, 'success');
+            updateUI();
+        }
+
+        // UI & Logging
+        function updateUI() {
+            const display = document.getElementById("item-display");
+            
+            // Toggle Buttons
+            const hasItem = currentItem !== null;
+            document.getElementById("btn-add").disabled = !hasItem || (hasItem && currentItem.rarity === 'unique');
+            document.getElementById("btn-remove").disabled = !hasItem || (hasItem && currentItem.rarity === 'unique');
+            document.getElementById("btn-reroll").disabled = !hasItem || (hasItem && currentItem.rarity === 'unique');
+            document.getElementById("btn-legendary").disabled = !hasItem || (hasItem && currentItem.rarity !== 'rare');
+            document.getElementById("btn-unique").disabled = !hasItem || (hasItem && currentItem.rarity === 'unique');
+
+            if (!hasItem) {
+                display.className = "item-display";
+                display.innerHTML = '<div style="color: #666; text-align: center; margin-top: 80px;">Item destroyed.<br>Generate a new base item.</div>';
+                return;
+            }
+
+            // Update Class Rarity
+            display.className = `item-display rarity-${currentItem.rarity}`;
+
+            // Render Item HTML
+            let html = `<div class="item-title rarity-${currentItem.rarity}">${currentItem.name}</div>`;
+            
+            if (currentItem.affixes.length > 0) {
+                html += `<ul class="affix-list">`;
+                currentItem.affixes.forEach(affix => {
+                    html += `<li>${affix}</li>`;
+                });
+                html += `</ul>`;
+            } else {
+                html += `<div style="color: #666; font-style: italic; margin: 10px 0;">No affixes.</div>`;
+            }
+
+            if (currentItem.legendaryPower) {
+                const powerColorClass = currentItem.rarity === 'unique' ? 'rarity-unique' : 'rarity-legendary';
+                html += `<div class="legendary-power ${powerColorClass}">★ ${currentItem.legendaryPower}</div>`;
+            }
+
+            display.innerHTML = html;
+        }
+
+        function log(message, type = 'normal') {
+            const logBox = document.getElementById("log");
+            const time = new Date().toLocaleTimeString([], { hour12: false });
+            let typeClass = '';
+            
+            if (type === 'success') typeClass = 'log-success';
+            if (type === 'error') typeClass = 'log-error';
+            if (type === 'warning') typeClass = 'log-warning';
+
+            logBox.innerHTML += `<div class="log-entry ${typeClass}">[${time}] ${message}</div>`;
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+    </script>
+</body>
+</html>
